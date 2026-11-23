@@ -3,6 +3,8 @@ export type FlightStatus =
   | 'loading'
   | 'boarding'
   | 'departed'
+  | 'arrived'
+  | 'cancelled'
 
 export type BaggageStatus =
   | 'registered'

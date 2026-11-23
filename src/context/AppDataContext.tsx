@@ -19,6 +19,9 @@ import {
   initialScanEvents,
 } from '../data/mockData'
 
+import { supabase } from '../lib/supabase'
+import { useAuth } from './AuthContext'
+
 // 1. Application state
 
 interface AppState {
@@ -101,6 +104,12 @@ function getInitialState(): AppState {
 // 2. Actions
 
 type AppAction =
+  
+  | {
+      type: 'SET_FLIGHTS'
+      payload: Flight[]
+    }
+
   | {
       type: 'ADD_FLIGHT'
       payload: Flight
@@ -131,6 +140,13 @@ type AppAction =
 
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+
+    case 'SET_FLIGHTS':
+      return {
+        ...state,
+        flights: action.payload,
+      }
+    
     case 'ADD_FLIGHT': {
         const exists = state.flights.some(
             (flight) =>
@@ -146,7 +162,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
         }
 
-        case 'UPDATE_FLIGHT': {
+      case 'UPDATE_FLIGHT': {
         const exists = state.flights.some(
             (flight) =>
             flight.id !== action.payload.id &&
@@ -180,12 +196,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
             ),
         }
         }
-    case 'SCAN_BAGGAGE': {
-      const { payload } = action
 
-      const updatedBaggage =
-        payload.result === 'accepted'
-          ? state.baggage.map((item) =>
+      case 'SCAN_BAGGAGE': {
+        const { payload } = action
+
+        const updatedBaggage =
+          payload.result === 'accepted'
+            ? state.baggage.map((item) =>
               item.tag === payload.baggageTag
                 ? { ...item, status: 'loaded' as const }
                 : item,
@@ -248,6 +265,42 @@ export function AppDataProvider({
   undefined,
   getInitialState,
 )
+
+const { session } = useAuth()
+
+  useEffect(() => {
+    if (!session) return
+
+    async function loadFlights() {
+      const { data, error } = await supabase
+        .from('flights')
+        .select(
+          'id, flight_number, origin, destination, scheduled_departure, status',
+        )
+        .order('scheduled_departure', { ascending: true })
+
+      if (error) {
+        console.error('Error loading flights:', error)
+        return
+      }
+
+      const mappedFlights: Flight[] = (data ?? []).map((flight) => ({
+        id: flight.id,
+        flightNumber: flight.flight_number,
+        origin: flight.origin,
+        destination: flight.destination,
+        departureTime: flight.scheduled_departure,
+        status: flight.status as Flight['status'],
+      }))
+
+      dispatch({
+        type: 'SET_FLIGHTS',
+        payload: mappedFlights,
+      })
+    }
+
+    void loadFlights()
+  }, [session])
 
 useEffect(() => {
   try {
